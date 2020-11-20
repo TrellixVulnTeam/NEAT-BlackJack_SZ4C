@@ -7,9 +7,6 @@ class Player:
     def hit(self, deck):
         deck.deal_to(self)
 
-    def stay(self):
-        pass
-
     def calc_score(self):
         score = 0
         for card in self.hand:
