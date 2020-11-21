@@ -22,6 +22,11 @@ class Deck:
         player.hand.append(card)
         player.calc_score()
 
+    def top_card(self):
+        return self.cards[0]
+
+    def burn_top(self):
+        return self.cards.pop(0)
 
     def display(self):
         for card in self.cards:
