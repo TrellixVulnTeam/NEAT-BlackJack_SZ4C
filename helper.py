@@ -51,8 +51,8 @@ def reward_genomes_for_wins(players, dealer, ge):
             msg = "win"
             player.wins += 1
             ge[j].fitness += 10
-            if player.score == 21:
-                ge[j].fitness += 10
+            if player.score == 21 and len(player.hand) == 2:
+                ge[j].fitness += 5
         elif player.score < dealer.score <= 21 or dealer.score <= 21 < player.score:
             msg = "loss"
             player.losses += 1

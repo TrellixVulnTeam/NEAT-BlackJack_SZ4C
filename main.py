@@ -6,7 +6,7 @@ from Classes.Deck import Deck
 from Classes.Graph import Graph
 from Classes.Player import Player
 
-from config import C_HANDS_PER_GENERATION, C_FITNESS_THRESHOLD, C_NEAT_CONFIG_DEFAULTS
+from config import C_HANDS_PER_GENERATION, C_FITNESS_THRESHOLD, C_NEAT_CONFIG_DEFAULTS, C_POP_PER_GEN
 from helper import display_game_results, display_sim_results, network, deal_two_each, reward_genomes_for_wins, average
 
 # Globals to keep track of
@@ -108,7 +108,7 @@ def run(path):
     best_fitness = -1000
     winner = neat.DefaultGenome(0)
 
-    graph = Graph(C_FITNESS_THRESHOLD)
+    graph = Graph(C_FITNESS_THRESHOLD, C_HANDS_PER_GENERATION, C_POP_PER_GEN)
 
     while best_fitness < C_FITNESS_THRESHOLD:
         winner = pop.run(eval_genomes, 1)
@@ -120,7 +120,7 @@ def run(path):
 
         best_fitness = winner.fitness
 
-    print("Winner: ")
+    print("Winner (after %s hand of blackjack):" % (C_HANDS_PER_GENERATION * C_POP_PER_GEN * G_gen))
     print(winner)
     with open("winner-feedforward", 'wb') as f:
         pickle.dump(winner, f)
