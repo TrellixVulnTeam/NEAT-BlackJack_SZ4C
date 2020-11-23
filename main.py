@@ -1,24 +1,32 @@
 import os
-from random import random
-
+import pickle
+import matplotlib.pyplot as plt
 import neat
 
 from Classes.Deck import Deck
 from Classes.Player import Player
 
-from config import C_HANDS_PER_GENERATION
-from helper import display_game_results, display_sim_results
+from config import C_HANDS_PER_GENERATION, C_FITNESS_THRESHOLD, C_MIN_GRAPH_WIDTH
+from helper import display_game_results, display_sim_results, update_graph
 
 gen = 0
+
+hall_of_fame = []
+ao10 = []
+threshold_line = [C_FITNESS_THRESHOLD] * (C_MIN_GRAPH_WIDTH + 1)
 
 
 def eval_genomes(genomes, config):
     global gen
+    global hall_of_fame
     gen += 1
 
     players = []
     nets = []
     ge = []
+
+    best_fitness = -1000
+    best_player = Player()
 
     for _, g in genomes:
         g.fitness = 0
@@ -64,9 +72,10 @@ def eval_genomes(genomes, config):
                 ge[n].fitness += 0.1
 
         # Standard dealer rules, hit on and up to 17
-        while dealer.score <= 17:
+        while dealer.score <= 16:
             dealer.hit(deck)
 
+        msg = ''
         for j, player in enumerate(players):
             # Who won? Set message and counts
             if dealer.score < player.score <= 21 or player.score <= 21 < dealer.score:
@@ -83,15 +92,13 @@ def eval_genomes(genomes, config):
                 msg = "tie"
                 player.ties += 1
 
-        best_fitness = -1000
-        best_player = Player()
         for j, g in enumerate(ge):
             if g.fitness > best_fitness:
                 best_fitness = g.fitness
                 best_player = players[j]
 
         # Display the results of the final game
-        if i+1 == C_HANDS_PER_GENERATION:
+        if i + 1 == C_HANDS_PER_GENERATION:
             display_game_results(best_player, dealer, i, msg)
 
         # Make sure their hands are empty
@@ -101,9 +108,19 @@ def eval_genomes(genomes, config):
 
     # Display the results of the whole simulation
     display_sim_results(best_player)
+    hall_of_fame.append(best_fitness)
+    if len(hall_of_fame) < 10:
+        ao10.append(0)
+    else:
+        ao10.append(sum(hall_of_fame[-10:]) / 10)
+    while len(hall_of_fame) > len(threshold_line) - 1:
+        threshold_line.append(C_FITNESS_THRESHOLD)
 
 
 def run(path):
+    global gen
+    global hall_of_fame
+
     config = neat.config.Config(neat.DefaultGenome,
                                 neat.DefaultReproduction,
                                 neat.DefaultSpeciesSet,
@@ -115,8 +132,28 @@ def run(path):
     pop.add_reporter(neat.StdOutReporter(True))
     pop.add_reporter(neat.StatisticsReporter())
 
-    winner = pop.run(eval_genomes, 200)
+    best_fitness = 0
+    winner = ""
+
+    mng = plt.get_current_fig_manager()
+    mng.full_screen_toggle()
+    plt.ion()
+
+    while best_fitness < C_FITNESS_THRESHOLD:
+        winner = pop.run(eval_genomes, 1)
+        while winner.fitness >= C_FITNESS_THRESHOLD:
+            print("Press any key to terminate...")
+            input()
+            break
+        best_fitness = winner.fitness
+
+        update_graph(hall_of_fame, ao10, threshold_line, gen)
+
+    print("Winner: ")
     print(winner)
+    with open("winner-feedforward", 'wb') as f:
+        pickle.dump(winner, f)
+    print("Winner saved")
 
 
 if __name__ == "__main__":
