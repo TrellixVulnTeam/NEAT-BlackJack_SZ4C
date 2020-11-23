@@ -1,3 +1,4 @@
+import neat
 from matplotlib import style
 import matplotlib.pyplot as plt
 
@@ -22,21 +23,56 @@ def display_sim_results(player):
     print(tabulate(table, headers=["Hands", "Wins", "Win %", "Tie %", "Loss %", "Win/Tie %"]) + "\n")
 
 
-def update_graph(hall_of_fame, ao10, threshold_line, gen):
-    style.use('fivethirtyeight')
+def deal_two_each(players, deck):
+    # Deal two cards to each
+    for player in players:
+        player.hand.append(deck.top_card())
 
-    plt.plot(hall_of_fame, 'g-', label="Best")
-    plt.plot(ao10, 'b--', label="Average of 10")
-    plt.plot(threshold_line, 'r-', label="Goal")
+    deck.burn_top()
 
-    plt.title("NEAT Learning BlackJack -- Gen: %s" % gen)
-    plt.xlabel("Generations")
-    plt.ylabel("Fitness")
-    plt.legend()
+    for player in players:
+        player.hand.append(deck.top_card())
+        player.calc_score()
 
-    width = C_MIN_GRAPH_WIDTH if len(hall_of_fame) - 1 < C_MIN_GRAPH_WIDTH else len(hall_of_fame) - 1
-    plt.axis([0, width, -C_FITNESS_THRESHOLD, C_FITNESS_THRESHOLD * 1.5])
+    deck.burn_top()
 
-    plt.draw()
-    plt.pause(0.0001)
-    plt.clf()
+    return players, deck
+
+
+def network(g, config):
+    return neat.nn.FeedForwardNetwork.create(g, config)
+
+
+def reward_genomes_for_wins(players, dealer, ge):
+    msg = ''
+    for j, player in enumerate(players):
+        # Who won? Set message and counts
+        if dealer.score < player.score <= 21 or player.score <= 21 < dealer.score:
+            msg = "win"
+            player.wins += 1
+            ge[j].fitness += 10
+            if player.score == 21:
+                ge[j].fitness += 10
+        elif player.score < dealer.score <= 21 or dealer.score <= 21 < player.score:
+            msg = "loss"
+            player.losses += 1
+            ge[j].fitness -= 10
+        else:
+            msg = "tie"
+            player.ties += 1
+
+    return players, ge, msg
+
+
+def average(hall_of_fame):
+    if len(hall_of_fame) < 11:
+        return round(sum(hall_of_fame) / len(hall_of_fame))
+    else:
+        return round(sum(hall_of_fame[-10:]) / 10)
+
+
+def bottom_margin(num):
+    if num > 0:
+        return round(num / 9.0)
+    else:
+        return round(num * 1.1)

@@ -1,39 +1,46 @@
 import os
 import pickle
-import matplotlib.pyplot as plt
 import neat
 
 from Classes.Deck import Deck
+from Classes.Graph import Graph
 from Classes.Player import Player
 
-from config import C_HANDS_PER_GENERATION, C_FITNESS_THRESHOLD, C_MIN_GRAPH_WIDTH
-from helper import display_game_results, display_sim_results, update_graph
+from config import C_HANDS_PER_GENERATION, C_FITNESS_THRESHOLD, C_NEAT_CONFIG_DEFAULTS
+from helper import display_game_results, display_sim_results, network, deal_two_each, reward_genomes_for_wins, average
 
-gen = 0
+# Globals to keep track of
+G_gen = 0
+G_hall_of_fame = [0]
+G_ao10 = [0]
 
-hall_of_fame = []
-ao10 = []
-threshold_line = [C_FITNESS_THRESHOLD] * (C_MIN_GRAPH_WIDTH + 1)
 
-
+# What will evaluate our genomes
 def eval_genomes(genomes, config):
-    global gen
-    global hall_of_fame
-    gen += 1
+    # Grab our globals
+    global G_gen
+    global G_hall_of_fame
 
+    # Increment generation
+    G_gen += 1
+
+    # Make our empty lists of players, genomes, and N networks
     players = []
     nets = []
     ge = []
 
+    # Set an impossibly low best fitness, so we can easily find our best of each generation
     best_fitness = -1000
     best_player = Player()
 
+    # For each genome...
     for _, g in genomes:
+        # Give them a starting fitness of 0
         g.fitness = 0
 
+        # Add players, neural networks, and genomes to our own lists
         players.append(Player())
-        net = neat.nn.FeedForwardNetwork.create(g, config)
-        nets.append(net)
+        nets.append(network(g, config))
         ge.append(g)
 
     # For every hand we want to play in a simulation...
@@ -42,55 +49,32 @@ def eval_genomes(genomes, config):
         deck = Deck()
         dealer = Player()
 
-        # Deal two cards to each
-        for player in players:
-            player.hand.append(deck.top_card())
-
-        deck.burn_top()
-
-        for player in players:
-            player.hand.append(deck.top_card())
-            player.calc_score()
-
-        deck.burn_top()
+        # Deal two cards to each player
+        players, deck = deal_two_each(players, deck)
 
         for _ in range(2):
             deck.deal_to(dealer)
 
-        for n, player in enumerate(players):
+        for j, player in enumerate(players):
             d = Deck()
             d.cards = []
             for card in deck.cards:
                 d.cards.append(card)
 
             # Activation function
-            output = nets[n].activate((player.score, player.has_ace, dealer.hand[0].value))
+            inputs = player.score, player.has_ace, dealer.hand[0].value
+            output = nets[j].activate(inputs)
 
             # While we have less than 17 points, hit, except 10% of the time stay
             while output[0] > 0.5 and player.score < 21:
                 player.hit(d)
-                ge[n].fitness += 0.1
+                ge[j].fitness += 0.1
 
-        # Standard dealer rules, hit on and up to 17
+        # Standard dealer rules, hit on and up to 16
         while dealer.score <= 16:
             dealer.hit(deck)
 
-        msg = ''
-        for j, player in enumerate(players):
-            # Who won? Set message and counts
-            if dealer.score < player.score <= 21 or player.score <= 21 < dealer.score:
-                msg = "win"
-                player.wins += 1
-                ge[j].fitness += 10
-                if player.score == 21:
-                    ge[j].fitness += 10
-            elif player.score < dealer.score <= 21 or dealer.score <= 21 < player.score:
-                msg = "loss"
-                player.losses += 1
-                ge[j].fitness -= 10
-            else:
-                msg = "tie"
-                player.ties += 1
+        players, ge, msg = reward_genomes_for_wins(players, dealer, ge)
 
         for j, g in enumerate(ge):
             if g.fitness > best_fitness:
@@ -108,46 +92,33 @@ def eval_genomes(genomes, config):
 
     # Display the results of the whole simulation
     display_sim_results(best_player)
-    hall_of_fame.append(best_fitness)
-    if len(hall_of_fame) < 10:
-        ao10.append(0)
-    else:
-        ao10.append(sum(hall_of_fame[-10:]) / 10)
-    while len(hall_of_fame) > len(threshold_line) - 1:
-        threshold_line.append(C_FITNESS_THRESHOLD)
 
 
 def run(path):
-    global gen
-    global hall_of_fame
+    global G_gen
+    global G_hall_of_fame
 
-    config = neat.config.Config(neat.DefaultGenome,
-                                neat.DefaultReproduction,
-                                neat.DefaultSpeciesSet,
-                                neat.DefaultStagnation,
-                                path)
-
+    config = neat.config.Config(*C_NEAT_CONFIG_DEFAULTS, path)
     pop = neat.Population(config)
 
     pop.add_reporter(neat.StdOutReporter(True))
-    pop.add_reporter(neat.StatisticsReporter())
+    stats = neat.StatisticsReporter()
+    pop.add_reporter(stats)
 
-    best_fitness = 0
-    winner = ""
+    best_fitness = -1000
+    winner = neat.DefaultGenome(0)
 
-    mng = plt.get_current_fig_manager()
-    mng.full_screen_toggle()
-    plt.ion()
+    graph = Graph(C_FITNESS_THRESHOLD)
 
     while best_fitness < C_FITNESS_THRESHOLD:
         winner = pop.run(eval_genomes, 1)
-        while winner.fitness >= C_FITNESS_THRESHOLD:
-            print("Press any key to terminate...")
-            input()
-            break
-        best_fitness = winner.fitness
 
-        update_graph(hall_of_fame, ao10, threshold_line, gen)
+        G_hall_of_fame.append(winner.fitness)
+        G_ao10.append(average(G_hall_of_fame))
+
+        graph.update(G_hall_of_fame, G_ao10, G_gen)
+
+        best_fitness = winner.fitness
 
     print("Winner: ")
     print(winner)
