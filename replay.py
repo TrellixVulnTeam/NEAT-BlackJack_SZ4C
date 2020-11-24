@@ -16,7 +16,7 @@ G_ao10 = []
 
 
 # What will evaluate our genomes
-def eval_genomes(genomes, config):
+def eval_genomes(genome, config):
     # Grab our globals
     global G_gen
     global G_hall_of_fame
@@ -34,17 +34,19 @@ def eval_genomes(genomes, config):
     best_player = Player()
 
     # For each genome...
-    for _, g in genomes:
         # Give them a starting fitness of 0
-        g.fitness = 0
 
-        # Add players, neural networks, and genomes to our own lists
-        players.append(Player())
-        nets.append(network(g, config))
-        ge.append(g)
+    g = genome
+
+    g.fitness = 0
+
+    # Add players, neural networks, and genomes to our own lists
+    players.append(Player())
+    nets.append(network(g, config))
+    ge.append(g)
 
     # For every hand we want to play in a simulation...
-    for i in range(C_HANDS_PER_GENERATION):
+    for i in range(C_HANDS_PER_GENERATION*1000):
         # Let's use a new deck each time
         deck = Deck()
         dealer = Player()
@@ -93,38 +95,22 @@ def eval_genomes(genomes, config):
     # Display the results of the whole simulation
     display_sim_results(best_player)
 
+    return ge[0]
+
 
 def run(path):
     global G_gen
     global G_hall_of_fame
 
+    with open('winner-feedforward', 'rb') as f:
+        p = pickle.load(f)
+
     config = neat.config.Config(*C_NEAT_CONFIG_DEFAULTS, path)
-    pop = neat.Population(config)
 
-    pop.add_reporter(neat.StdOutReporter(True))
-    stats = neat.StatisticsReporter()
-    pop.add_reporter(stats)
+    winner = eval_genomes(p, config)
 
-    best_fitness = -1000
-    winner = neat.DefaultGenome(0)
-
-    graph = Graph(C_FITNESS_THRESHOLD, C_HANDS_PER_GENERATION, C_POP_PER_GEN)
-
-    while best_fitness < C_FITNESS_THRESHOLD:
-        winner = pop.run(eval_genomes, 1)
-
-        G_hall_of_fame.append(winner.fitness)
-        G_ao10.append(average(G_hall_of_fame))
-
-        graph.update(G_hall_of_fame, G_ao10, G_gen)
-
-        best_fitness = winner.fitness
-
-    print("Winner (after %s hand of blackjack):" % (C_HANDS_PER_GENERATION * C_POP_PER_GEN * G_gen))
-    print(winner)
-    with open("winner-feedforward", 'wb') as f:
-        pickle.dump(winner, f)
-    print("Winner saved")
+    print("Winner (after %s hand of blackjack):" % (C_HANDS_PER_GENERATION * 100))
+    print(winner.fitness)
 
 
 if __name__ == "__main__":

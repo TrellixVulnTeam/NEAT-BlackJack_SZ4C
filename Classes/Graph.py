@@ -30,20 +30,26 @@ class Graph:
 
         self.simulations = "{:,}".format(self.hands_per_gen * self.pop_per_gen * gen)
 
-        plt.title("NEAT Learning BlackJack -- Gen: %s -- Simulations: %s" % (self.gen, self.simulations))
+        plt.title("NEAT Learning BlackJack -- Gen: %s -- Simulations: %s" % (self.gen - 1, self.simulations))
         plt.xlabel("Generations")
         plt.ylabel("Fitness")
 
         self.width = C_MIN_GRAPH_WIDTH if len(hall_of_fame) - 1 < C_MIN_GRAPH_WIDTH else len(hall_of_fame) - 1
+        self.width = round(self.width*1.05)
+
         self.threshold_line = [C_FITNESS_THRESHOLD] * (self.width + 1)
 
         plt.plot(self.hall_of_fame, 'g-', label="Best")
         plt.plot(self.ao10, 'b--', label="Average of 10")
         plt.plot(self.threshold_line, 'r-', label="Goal")
 
+        if self.hall_of_fame[-1] > self.fitness_threshold:
+            # plt.plot([gen-1], [self.hall_of_fame[-1]], 'yo')
+            plt.text((gen-1), (self.hall_of_fame[-1]), round(self.hall_of_fame[-1]))
+
         plt.legend()
 
-        top = max(C_FITNESS_THRESHOLD * 1.5, max(self.hall_of_fame)*1.5)
+        top = max(C_FITNESS_THRESHOLD * 1.5, max(self.hall_of_fame) * 1.5)
         bottom = bottom_margin(min(hall_of_fame))
 
         plt.axis([0, self.width, bottom, top])
